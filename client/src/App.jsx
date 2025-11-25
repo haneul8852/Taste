@@ -196,6 +196,7 @@ const styles = {
     animation: 'spin 0.8s linear infinite',
     marginRight: '10px',
   },
+  // [NEW] 리스트 아이템 스타일
   listItem: {
     display: 'flex', alignItems: 'center', gap: '12px',
     padding: '12px', borderRadius: '8px', backgroundColor: '#2a2a2a',
@@ -271,6 +272,7 @@ const styles = {
   navLinkActive: {
     color: '#1db954',
   },
+  // 랜딩 페이지
   landingContainer: {
     width: '100%',
     minHeight: '100vh',
@@ -378,8 +380,8 @@ const styles = {
 };
 
 // 환경 변수에서 API 키 가져오기
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+const GOOGLE_MAPS_API_KEY = "AIzaSyACzTJtnMcCah84-Dudag_eVvMHJTUDPyU";
+const API_URL = 'http://localhost:5000'; 
 
 const defaultCenter = { lat: 37.5665, lng: 126.9780 };
 
@@ -411,6 +413,7 @@ function App() {
   useEffect(() => {
     document.body.style.margin = '0';
     document.body.style.padding = '0';
+    // 가로 스크롤은 항상 숨기고, 세로 스크롤은 로그인 여부에 따라 제어합니다.
     document.body.style.overflowX = 'hidden';
     document.body.style.overflowY = token ? 'hidden' : 'auto';
 
@@ -421,13 +424,10 @@ function App() {
       .pac-item:hover { background-color: #333; }
       .pac-item-query { color: #fff; }
       
-      /* ★★★ 지도 깨짐 방지 CSS 추가 (중요) ★★★ */
+      /* ★★★ 지도 타일 깨짐 방지 (수정됨) ★★★ */
       .gm-style img {
         max-width: none !important;
-        height: auto !important;
-        border: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        max-height: none !important;
       }
 
       /* 스크롤바 스타일 */
@@ -475,7 +475,7 @@ function App() {
     };
   }, [token]);
 
-  // 섹션 애니메이션
+  // 섹션 애니메이션(스크롤 시 등장) - 랜딩 페이지에서도 동작하도록 early return 이전에 위치
   useEffect(() => {
     const els = document.querySelectorAll('[data-animate]');
     if (!els || els.length === 0) return;
@@ -525,13 +525,34 @@ function App() {
   const initMap = () => {
     if (!window.google) return;
 
+  const darkMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }]
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }]
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }]
+  },
+];
+
     googleMapObj.current = new window.google.maps.Map(mapRef.current, {
-      center: defaultCenter,
-      zoom: 13,
-      disableDefaultUI: false,
-      zoomControl: true,
-      styles: [ { elementType: "geometry", stylers: [{ color: "#242f3e" }] } ]
-    });
+    center: defaultCenter,
+    zoom: 13,
+    disableDefaultUI: false,
+    zoomControl: true,
+    styles: darkMapStyle,
+  });
 
     if (searchInputRef.current) {
         const autocomplete = new window.google.maps.places.Autocomplete(searchInputRef.current, {
@@ -581,14 +602,15 @@ function App() {
     );
   };
 
-  // 리스트 항목 클릭 시 이동
+  // [NEW] 리스트 항목 클릭 시 해당 위치로 이동하는 함수
   const flyToLocation = (loc) => {
     if(!googleMapObj.current) return;
 
     const pos = { lat: loc.latitude, lng: loc.longitude };
     googleMapObj.current.setCenter(pos);
-    googleMapObj.current.setZoom(16);
+    googleMapObj.current.setZoom(16); // 줌 땡겨주기
 
+    // 해당 마커 찾아서 클릭 트리거 (팝업 띄우기)
     const targetMarker = markersRef.current.find(marker => {
       const markerPos = marker.getPosition();
       return markerPos.lat() === loc.latitude && markerPos.lng() === loc.longitude;
@@ -598,9 +620,10 @@ function App() {
     }
   };
 
-  // 추억 삭제
+  // 추억 삭제 함수
   const handleDeleteMemory = async (memoryId, e) => {
-    e.stopPropagation();
+    e.stopPropagation(); // 클릭 이벤트 전파 방지
+
     if (!window.confirm('정말로 이 추억을 삭제하시겠습니까?')) return;
 
     try {
@@ -633,7 +656,7 @@ function App() {
       const res = await axios.get(`${API_URL}/locations`, {
         params: {
           user_id: userId,
-          view_mode: mode
+          view_mode: mode // 'my' | 'public'
         }
       });
       setLocations(res.data);
@@ -642,7 +665,6 @@ function App() {
     }
   };
 
-  // 마커 및 팝업 렌더링
   useEffect(() => {
     if (!googleMapObj.current || !window.google) return;
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -684,12 +706,12 @@ function App() {
 
             ${loc.spotify_track_id ? `
                 <div style="width:100%; height:80px; box-sizing: border-box; margin:0;">
-                    <iframe 
-                        src="https://open.spotify.com/embed/track/${loc.spotify_track_id}?utm_source=generator&theme=0" 
-                        width="100%" 
-                        height="80" 
-                        frameborder="0" 
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                    <iframe
+                        src="https://open.spotify.com/embed/track/${loc.spotify_track_id}?utm_source=generator&theme=0"
+                        width="100%"
+                        height="80"
+                        frameborder="0"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                         loading="lazy"
                         style="border-radius:12px; display:block; border:none;"
                     ></iframe>
@@ -706,11 +728,15 @@ function App() {
       });
 
       marker.addListener('click', () => {
+        // 이전에 열린 팝업이 있으면 닫기
         if (currentInfoWindowRef.current) {
           currentInfoWindowRef.current.close();
         }
+        // 새 팝업 열기
         infoWindow.open(googleMapObj.current, marker);
+        // 현재 팝업 저장
         currentInfoWindowRef.current = infoWindow;
+        // 마커를 중앙으로 부드럽게 이동
         googleMapObj.current.panTo(marker.getPosition());
       });
 
@@ -750,9 +776,9 @@ function App() {
     setIsUploading(true);
     try {
         await axios.post(`${API_URL}/photos`, formData, {
-            headers: { 
+            headers: {
                 'Content-Type': 'multipart/form-data',
-                'Authorization': `Bearer ${token}` 
+                'Authorization': `Bearer ${token}`
             }
         });
         showNotification("저장 완료! 🎵 노래를 찾았어요.");
@@ -772,6 +798,7 @@ function App() {
   const [loginButtonHover, setLoginButtonHover] = useState(false);
   const [ctaButtonHover, setCtaButtonHover] = useState(false);
 
+  // 랜딩 페이지 렌더링
   if (!token) {
     return (
       <div style={styles.landingContainer}>
@@ -783,10 +810,10 @@ function App() {
           <div style={styles.navMenu}>
             <a style={styles.navLink} href="#features">기능</a>
             <a style={styles.navLink} href="#how-it-works">사용방법</a>
-            <button 
+            <button
               style={{
-                ...styles.loginButton, 
-                padding: '12px 32px', 
+                ...styles.loginButton,
+                padding: '12px 32px',
                 fontSize: '1rem',
                 ...(loginButtonHover ? { transform: 'scale(1.05)' } : {})
               }}
@@ -809,7 +836,7 @@ function App() {
             AI가 당신의 추억을 분석하고, Spotify에서 가장 어울리는 노래를 추천합니다.<br/>
             지도 위에 추억을 표시하고 언제든 다시 떠올려보세요.
           </p>
-          <button 
+          <button
             style={{
               ...styles.ctaButton,
               ...(ctaButtonHover ? { transform: 'scale(1.05) translateY(-2px)', boxShadow: '0 12px 40px rgba(29, 185, 84, 0.6)' } : {})
@@ -822,50 +849,73 @@ function App() {
           </button>
         </section>
 
+        {/* 사용 방법 섹션 (앵커용) */}
         <section id="how-it-works" style={styles.howItWorksSection} data-animate>
           <h2 style={{fontSize:'2rem', fontWeight:800, marginBottom:'20px', background: 'linear-gradient(135deg, #fff 0%, #aaa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>사용 방법</h2>
           <p>1) '시작하기'로 Spotify로 로그인하세요.<br/>2) 지도에서 위치를 선택하거나 검색해 추억을 입력하세요.<br/>3) 사진을 업로드하고 공개 여부를 설정한 뒤 저장합니다..</p>
         </section>
 
+        {/* 기능 섹션 */}
         <section id="features" style={styles.featuresSection} data-animate>
           <h2 style={styles.sectionTitle}>주요 기능</h2>
           <div style={styles.featuresGrid}>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>🗺️</div>
               <h3 style={styles.featureTitle}>지도 기반 추억 관리</h3>
-              <p style={styles.featureDesc}>Google Maps를 이용해 정확한 위치에 추억을 저장하고, 언제든 지도에서 다시 찾아볼 수 있습니다.</p>
+              <p style={styles.featureDesc}>
+                Google Maps를 이용해 정확한 위치에 추억을 저장하고,
+                언제든 지도에서 다시 찾아볼 수 있습니다.
+              </p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>🤖</div>
               <h3 style={styles.featureTitle}>AI 감정 분석</h3>
-              <p style={styles.featureDesc}>OpenAI GPT가 당신의 추억 내용을 분석하여, 그 순간의 감정과 분위기에 딱 맞는 노래를 찾아드립니다.</p>
+              <p style={styles.featureDesc}>
+                OpenAI GPT가 당신의 추억 내용을 분석하여,
+                그 순간의 감정과 분위기에 딱 맞는 노래를 찾아드립니다.
+              </p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>🎵</div>
               <h3 style={styles.featureTitle}>Spotify 연동</h3>
-              <p style={styles.featureDesc}>Spotify의 방대한 음악 라이브러리에서 추억에 어울리는 완벽한 노래를 추천받고, 바로 재생할 수 있습니다.</p>
+              <p style={styles.featureDesc}>
+                Spotify의 방대한 음악 라이브러리에서 추억에 어울리는
+                완벽한 노래를 추천받고, 바로 재생할 수 있습니다.
+              </p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>📸</div>
               <h3 style={styles.featureTitle}>사진과 함께</h3>
-              <p style={styles.featureDesc}>추억이 담긴 사진을 업로드하여 노래와 함께 저장하고, 나중에 다시 보며 그때의 감정을 되살릴 수 있습니다.</p>
+              <p style={styles.featureDesc}>
+                추억이 담긴 사진을 업로드하여 노래와 함께 저장하고,
+                나중에 다시 보며 그때의 감정을 되살릴 수 있습니다.
+              </p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>🌍</div>
               <h3 style={styles.featureTitle}>공유 기능</h3>
-              <p style={styles.featureDesc}>원하는 추억을 공개 설정하여 다른 사람들과 공유하거나, 다른 사람들의 추억을 둘러볼 수 있습니다.</p>
+              <p style={styles.featureDesc}>
+                원하는 추억을 공개 설정하여 다른 사람들과 공유하거나,
+                다른 사람들의 추억을 둘러볼 수 있습니다.
+              </p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>🔒</div>
               <h3 style={styles.featureTitle}>프라이버시 보호</h3>
-              <p style={styles.featureDesc}>모든 추억은 기본적으로 비공개 설정되며, 본인만 확인하고 관리할 수 있습니다.</p>
+              <p style={styles.featureDesc}>
+                모든 추억은 기본적으로 비공개 설정되며,
+                본인만 확인하고 관리할 수 있습니다.
+              </p>
             </div>
           </div>
         </section>
 
+        {/* 푸터 */}
         <footer style={styles.footer}>
           <p>© 2025 추억 재생. All rights reserved.</p>
-          <p style={{marginTop: '10px', fontSize: '0.8rem'}}>Powered by Spotify, Google Maps, OpenAI</p>
+          <p style={{marginTop: '10px', fontSize: '0.8rem'}}>
+            Powered by Spotify, Google Maps, OpenAI
+          </p>
         </footer>
       </div>
     );
@@ -880,21 +930,27 @@ function App() {
         {!isMapLoaded && <div style={styles.loadingOverlay}>지도를 불러오는 중...</div>}
       </div>
 
+      {/* 사이드 패널 (입력창 + 리스트) */}
       <div className="floating-panel" style={styles.floatingPanel}>
         <div style={{marginBottom: '10px'}}>
             <h3 style={styles.title}>🗺️ 추억 재생 지도</h3>
             <p style={styles.subtitle}>지도 클릭 또는 검색</p>
         </div>
 
+        {/* 보기 모드 토글 */}
         <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
           <button
             onClick={() => { setViewMode('my'); fetchLocations('my'); }}
             style={{
-              flex: 1, padding: '10px', borderRadius: '8px',
+              flex: 1,
+              padding: '10px',
+              borderRadius: '8px',
               border: viewMode === 'my' ? '2px solid #1db954' : '1px solid #444',
               background: viewMode === 'my' ? 'rgba(29, 185, 84, 0.2)' : '#2a2a2a',
               color: viewMode === 'my' ? '#1db954' : '#999',
-              cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem'
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '0.85rem'
             }}
           >
             내 추억
@@ -902,11 +958,15 @@ function App() {
           <button
             onClick={() => { setViewMode('public'); fetchLocations('public'); }}
             style={{
-              flex: 1, padding: '10px', borderRadius: '8px',
+              flex: 1,
+              padding: '10px',
+              borderRadius: '8px',
               border: viewMode === 'public' ? '2px solid #1db954' : '1px solid #444',
               background: viewMode === 'public' ? 'rgba(29, 185, 84, 0.2)' : '#2a2a2a',
               color: viewMode === 'public' ? '#1db954' : '#999',
-              cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem'
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '0.85rem'
             }}
           >
             둘러보기
@@ -916,6 +976,7 @@ function App() {
         <input ref={searchInputRef} type="text" placeholder="장소 검색 (예: 강남역)" style={styles.searchBox} />
         <button onClick={handleCurrentLocation} style={styles.locationButton}><span>📍 내 위치 찾기</span></button>
         
+        {/* 입력 폼 영역 */}
         <div style={{backgroundColor: '#222', padding: '15px', borderRadius: '12px', marginBottom: '20px'}}>
             <div style={{minHeight: '20px', marginBottom: '10px', fontSize: '0.85rem', color: '#888'}}>
                 {selectedLocation ? <span style={{color: '#1db954', fontWeight:'bold'}}>📍 위치 선택됨</span> : "아직 선택된 위치가 없습니다."}
@@ -929,6 +990,7 @@ function App() {
                 <textarea placeholder="이 장소의 추억 (노래 추천에 사용돼요!)" value={review} onChange={(e) => setReview(e.target.value)} style={styles.textArea} />
             </div>
 
+            {/* 공개/비공개 설정 */}
             <div style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0'}}>
               <input
                 type="checkbox"
@@ -947,12 +1009,20 @@ function App() {
                 disabled={!selectedLocation || isUploading}
                 style={{...styles.uploadButton, ...(!selectedLocation || isUploading ? styles.uploadButtonDisabled : {})}}
             >
-                {isUploading ? <><span style={styles.loadingSpinner}></span>업로드 중...</> : '💾 저장하기'}
+                {isUploading ? (
+                    <>
+                        <span style={styles.loadingSpinner}></span>
+                        업로드 중...
+                    </>
+                ) : (
+                    '💾 저장하기'
+                )}
             </button>
         </div>
 
         <div style={styles.divider}></div>
         
+        {/* [NEW] 추억 리스트 영역 */}
         <h4 style={{margin:'0 0 10px 0', color:'#ddd'}}>📂 {viewMode === 'my' ? '나의 추억 목록' : '공유된 추억들'} ({locations.length})</h4>
         <div className="memory-list" style={{display:'flex', flexDirection:'column', gap:'10px', maxHeight:'300px', overflowY:'auto'}}>
             {locations.map((loc) => (
